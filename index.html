@@ -88,10 +88,16 @@ async function startScan(){
       lastScannedValue=text; lastScannedAt=now;
       const id=extractId(text);
       if(id){
+        // Stop the camera immediately after a valid Apple Music song ID is recognised.
+        if(scanner && scanning){
+          try { await scanner.stop(); } catch(stopError) {}
+          scanning=false;
+          $('startScan').textContent='▦ Kamera starten';
+        }
         $('songInput').value=text;
-        setStatus('QR-Code erkannt. Lade Song …');
-        await loadSong(id); 
-        setStatus('QR-Code erkannt. '+(previewUrl?'Hörprobe wird geladen. Wähle eine Dauer und tippe auf „Hörprobe abspielen“.':'Song geladen; Apple stellt möglicherweise keine Hörprobe bereit.'));
+        setStatus('QR-Code erkannt. Kamera gestoppt – lade Song …');
+        await loadSong(id);
+        setStatus('QR-Code erkannt. Kamera ist aus. '+(previewUrl?'Hörprobe wird geladen. Wähle eine Dauer und tippe auf „Hörprobe abspielen“.':'Song geladen; Apple stellt möglicherweise keine Hörprobe bereit.'));
       } else {
         setStatus('QR-Code erkannt, aber keine Apple-Music-Song-ID gefunden. Bitte nutze einen QR-Code aus dem Quiz-Generator.');
       }
