@@ -187,18 +187,7 @@
                 background: var(--green);
             }
             footer {
-                color: #87968a;
-                font-size: 0.78rem;
-                line-height: 1.5;
-                margin-top: 22px;
-            }
-            .nav {
-                display: flex;
-                gap: 10px;
-                flex-wrap: wrap;
-            }
-            .nav a {
-                color: #d8e9db;
+                display: none;
             }
             .auth-only {
                 max-width: 520px;
@@ -232,6 +221,25 @@
             .scan-heading {
                 font-size: 1.35rem;
             }
+            .duration-buttons {
+                display: flex;
+                gap: 8px;
+                justify-content: center;
+                flex-wrap: wrap;
+                margin: 14px 0;
+            }
+            .duration-buttons button {
+                min-width: 60px;
+            }
+            .duration-buttons button.selected {
+                outline: 2px solid var(--green);
+                background: #203b29;
+                color: #fff;
+            }
+            .reveal {
+                margin-top: 10px;
+                width: 100%;
+            }
         </style>
     </head>
     <body>
@@ -263,35 +271,37 @@
                     <p id="trackSub">
                         Der Songtitel und Interpret werden hier nicht angezeigt.
                     </p>
+                    <div
+                        class="duration-buttons"
+                        aria-label="Songdauer auswählen"
+                    >
+                        <button class="secondary selected" data-duration="1">
+                            1 s</button
+                        ><button class="secondary" data-duration="2">2 s</button
+                        ><button class="secondary" data-duration="4">4 s</button
+                        ><button class="secondary" data-duration="10">
+                            10 s
+                        </button>
+                    </div>
                     <div class="progress"><span id="progressBar"></span></div>
                     <div class="actions" style="justify-content: center">
                         <button class="primary" id="play" disabled>
                             ▶ Song starten
                         </button>
                     </div>
+                    <button class="secondary reveal" id="reveal" hidden>
+                        Songnamen verraten
+                    </button>
                 </section>
                 <section class="panel">
                     <h2 class="scan-heading">Scanne den nächsten Song</h2>
-                    <p>
-                        Richte die Kamera auf den QR-Code, um den nächsten Song
-                        abzuspielen.
-                    </p>
                     <div id="reader"></div>
                     <div class="actions">
                         <button class="primary" id="start">
-                            ▦ Kamera starten</button
-                        ><button class="secondary" id="stop">
-                            Kamera stoppen
+                            ▦ Kamera starten
                         </button>
                     </div>
-                    <div class="status" id="status" role="status">
-                        Bereit. Starte die Kamera und scanne einen Song.
-                    </div>
-                </section>
-                <section class="panel" style="text-align: center">
-                    <button class="secondary" id="logout">
-                        Spotify trennen
-                    </button>
+                    <div class="status" id="status" role="status"></div>
                 </section>
             </div>
             <section hidden>
@@ -305,13 +315,6 @@
                 <button id="openSpotify"></button><span id="loginLabel"></span
                 ><span id="profile"></span>
             </section>
-            <footer
-                id="footerNote"
-                class="small"
-                style="text-align: center; margin-top: 24px"
-            >
-                QR Song Quiz
-            </footer>
         </main>
         <script>
             const $ = (id) => document.getElementById(id),
@@ -338,6 +341,7 @@
                 currentTrack = "",
                 scanner = null,
                 running = false,
+                selectedDuration = 1,
                 stopTimer = null;
             function status(t) {
                 $("status").textContent = t;
@@ -546,20 +550,17 @@
             async function loadTrack(raw) {
                 let id = parseTrack(raw);
                 if (!id) {
-                    if (accessToken)
-                        status(
-                            "Dieser QR-Code enthält keine gültige Spotify-Track-ID.",
-                        );
+                    if (accessToken) status("Ungültiger QR-Code.");
                     return;
                 }
                 currentTrack = id;
                 $("trackTitle").textContent = "Song bereit";
-                $("trackSub").textContent =
-                    "Titel und Interpret bleiben geheim.";
+                $("trackSub").textContent = "";
+                $("reveal").hidden = false;
+                $("reveal").textContent = "Songnamen verraten";
                 $("play").disabled = false;
                 $("progressBar").style.width = "0%";
-                if (accessToken)
-                    status("Song erkannt. Tippe auf „Song starten“.");
+                if (accessToken) status("Song bereit.");
             }
             async function playTrack() {
                 if (!currentTrack) {
@@ -610,23 +611,26 @@
                         throw Error(
                             "Spotify konnte nicht starten. Prüfe Premium und aktives Gerät.",
                         );
-                    status(
-                        "Song läuft. Die App fordert nach ca. 1 Sekunde eine Pause an.",
-                    );
-                    let start = performance.now();
+                    status("Song läuft.");
+                    if (stopTimer) clearTimeout(stopTimer);
+                    let start = performance.now(),
+                        durationMs = selectedDuration * 1000;
                     const tick = () => {
                         let ms = performance.now() - start;
                         $("progressBar").style.width =
-                            Math.min(100, ms / 10) + "%";
-                        if (ms >= 1000) {
+                            Math.min(100, (ms / durationMs) * 100) + "%";
+                        if (ms >= durationMs) {
                             player.pause();
                             $("progressBar").style.width = "100%";
-                            status(
-                                "Pause angefordert. Die tatsächliche Dauer kann variieren.",
-                            );
+                            status("Song pausiert.");
                         } else requestAnimationFrame(tick);
                     };
                     requestAnimationFrame(tick);
+                    stopTimer = setTimeout(() => {
+                        if (player) player.pause();
+                        $("progressBar").style.width = "100%";
+                        status("Song pausiert.");
+                    }, durationMs);
                 } catch (e) {
                     status(e.message);
                 }
@@ -645,10 +649,7 @@
                         (txt) => {
                             let id = parseTrack(txt);
                             if (id && id !== currentTrack) loadTrack(txt);
-                            else if (!id)
-                                status(
-                                    "Dieser QR-Code enthält keine gültige Spotify-Track-ID.",
-                                );
+                            else if (!id) status("Ungültiger QR-Code.");
                         },
                         () => {},
                     );
@@ -661,26 +662,36 @@
                 }
             }
             $("login").onclick = login;
-            $("logout").onclick = () => {
-                localStorage.removeItem(TOK);
-                accessToken = "";
-                if (player) {
-                    player.disconnect();
-                    player = null;
-                    deviceId = "";
-                }
-                setLoginUI();
-            };
             $("start").onclick = startScan;
-            $("stop").onclick = async () => {
-                if (scanner && running) {
-                    try {
-                        await scanner.stop();
-                        scanner.clear();
-                    } catch (e) {}
-                    running = false;
+            document.querySelectorAll("[data-duration]").forEach(
+                (btn) =>
+                    (btn.onclick = () => {
+                        selectedDuration = Number(btn.dataset.duration);
+                        document
+                            .querySelectorAll("[data-duration]")
+                            .forEach((b) =>
+                                b.classList.toggle("selected", b === btn),
+                            );
+                    }),
+            );
+            $("reveal").onclick = async () => {
+                if (!currentTrack) return;
+                try {
+                    accessToken = await refresh();
+                    let r = await fetch(
+                        "https://api.spotify.com/v1/tracks/" + currentTrack,
+                        { headers: { Authorization: "Bearer " + accessToken } },
+                    );
+                    if (!r.ok) throw Error();
+                    let d = await r.json();
+                    $("trackTitle").textContent = d.name;
+                    $("trackSub").textContent = d.artists
+                        .map((a) => a.name)
+                        .join(", ");
+                    $("reveal").hidden = true;
+                } catch (e) {
+                    status("Songinformationen konnten nicht geladen werden.");
                 }
-                status("Kamera gestoppt.");
             };
             $("manualToggle").onclick = () => {
                 $("manualArea").hidden = !$("manualArea").hidden;
