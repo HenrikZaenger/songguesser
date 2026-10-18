@@ -70,7 +70,39 @@ async function loadSong(id){
 function play(){if(!previewUrl){setStatus('Für diesen Song ist keine Hörprobe verfügbar.');return}clearTimeout(timer);const audio=$('audio');audio.pause();try{audio.currentTime=0}catch(e){}$('answer').hidden=true;$('progressBar').style.width='0%';const startedAt=performance.now();audio.play().then(()=>{setStatus('Jetzt gut zuhören …');timer=setTimeout(()=>{audio.pause();$('progressBar').style.width='100%';setStatus('Fertig! Du kannst den Songnamen verraten oder den nächsten Song scannen.');},duration*1000);const tick=()=>{if(!audio.paused){$('progressBar').style.width=Math.min(100,((performance.now()-startedAt)/(duration*1000))*100)+'%';requestAnimationFrame(tick)}};requestAnimationFrame(tick)}).catch(()=>setStatus('Wiedergabe wurde vom Browser blockiert. Tippe bitte erneut auf „Hörprobe abspielen“.'))}
 document.querySelectorAll('[data-seconds]').forEach(b=>b.addEventListener('click',()=>{duration=Number(b.dataset.seconds);document.querySelectorAll('[data-seconds]').forEach(x=>x.classList.toggle('selected',x===b))}));
 $('play').addEventListener('click',play);$('reveal').addEventListener('click',()=>{if(!title)return;$('songTitle').textContent=title;$('artist').textContent=artist;$('answer').hidden=false;$('reveal').hidden=true});$('loadSong').addEventListener('click',()=>loadSong($('songInput').value));
-async function startScan(){if(!window.Html5Qrcode){setStatus('Scanner lädt noch.');return}try{if(!scanner)scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:230,height:230}},text=>{const id=extractId(text);if(id&&id!==songId)loadSong(id);else if(!id)setStatus('Das ist kein erkannter Apple-Music-Songlink.')},()=>{});scanning=true;setStatus('Kamera aktiv. Scanne den nächsten Apple-Music-QR-Code.')}catch(e){setStatus('Kamera nicht verfügbar. Bitte Kamera erlauben und die Seite über HTTPS öffnen.')}}
+let lastScannedValue='', lastScannedAt=0;
+async function startScan(){
+  if(!window.Html5Qrcode){setStatus('Der QR-Scanner wird noch geladen. Bitte kurz warten und erneut auf „Kamera starten“ tippen.');return}
+  try{
+    if(!scanner) scanner=new Html5Qrcode('reader', {formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE], verbose:false});
+    if(scanning){
+      await scanner.stop(); scanning=false; $('startScan').textContent='▦ Kamera starten'; setStatus('Kamera gestoppt.'); return;
+    }
+    const config={fps:15, qrbox:(viewWidth,viewHeight)=>{
+      const side=Math.floor(Math.min(viewWidth,viewHeight)*0.82);
+      return {width:side,height:side};
+    }, aspectRatio:1.0, disableFlip:false};
+    await scanner.start({facingMode:'environment'},config,async text=>{
+      const now=Date.now();
+      if(text===lastScannedValue && now-lastScannedAt<1800) return;
+      lastScannedValue=text; lastScannedAt=now;
+      const id=extractId(text);
+      if(id){
+        $('songInput').value=text;
+        setStatus('QR-Code erkannt. Lade Song …');
+        await loadSong(id); 
+        setStatus('QR-Code erkannt. '+(previewUrl?'Hörprobe wird geladen. Wähle eine Dauer und tippe auf „Hörprobe abspielen“.':'Song geladen; Apple stellt möglicherweise keine Hörprobe bereit.'));
+      } else {
+        setStatus('QR-Code erkannt, aber keine Apple-Music-Song-ID gefunden. Bitte nutze einen QR-Code aus dem Quiz-Generator.');
+      }
+    },()=>{});
+    scanning=true; $('startScan').textContent='Kamera stoppen'; setStatus('Kamera aktiv. Halte den QR-Code ruhig im markierten Bereich.');
+  }catch(e){
+    scanning=false;
+    const msg=String(e&&e.message||e||'');
+    setStatus('Scanner konnte nicht starten: '+(msg||'Bitte Kamerazugriff erlauben und die Seite über HTTPS öffnen.')+' Falls die Kamera bereits aktiv war, lade die Seite neu.');
+  }
+}
 $('startScan').addEventListener('click',startScan);
 const params=new URLSearchParams(location.search);loadSong(params.get('song')||params.get('id')||DEFAULT_ID);
 </script></body></html>
