@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101411">
+<title>Songquiz – Hörprobe testen</title>
+<script src="https://unpkg.com/html5-qrcode" defer></script>
+<style>
+:root{--bg:#101411;--panel:#1b231d;--green:#1ed760;--muted:#aab7ac;--line:#344239}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0b100d,#18221a);color:#f4f7f4;font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}main{max-width:620px;margin:auto;padding:22px 15px 40px}.brand{color:var(--green);font-weight:850;letter-spacing:.08em;font-size:.85rem}.panel{background:rgba(27,35,29,.97);border:1px solid var(--line);border-radius:22px;padding:20px;margin:16px 0}.hero{text-align:center;padding:24px 18px}.disc{width:112px;height:112px;border-radius:50%;margin:8px auto 20px;background:radial-gradient(circle,#0c120e 0 12%,var(--green) 13% 18%,#213b2a 19% 100%);display:grid;place-items:center;font-size:2.1rem}h1{font-size:clamp(2rem,8vw,3.2rem);line-height:1;margin:20px 0 12px;letter-spacing:-.04em}h2{font-size:1.2rem;margin:0 0 12px}p{color:var(--muted);line-height:1.5}.durations{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:18px 0}.durations button,button{border:0;border-radius:999px;padding:12px 16px;font:inherit;font-weight:750;cursor:pointer}.primary{background:var(--green);color:#071009}.secondary{background:#303c33;color:white;border:1px solid #4a5a4d}.durations .selected{outline:2px solid var(--green);background:#203b29}.actions{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:12px}.actions button{min-width:150px}.progress{height:5px;border-radius:99px;background:#344239;overflow:hidden;margin:16px 0}.progress span{display:block;height:100%;width:0;background:var(--green)}.status{background:#101811;border:1px solid #28372b;padding:12px;border-radius:12px;margin-top:14px;color:#dce9de;font-size:.92rem;overflow-wrap:anywhere}.reveal{width:100%;margin-top:12px}.meta{margin-top:15px;padding-top:14px;border-top:1px solid var(--line)}.meta[hidden]{display:none!important}#reader{width:100%;overflow:hidden;border-radius:14px}#reader video{border-radius:14px}input{width:100%;background:#0e1510;color:white;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit}label{display:block;font-size:.9rem;margin:10px 0 5px}.hint{font-size:.82rem}
+</style></head>
+<body><main>
+<div class="brand">● SONG QUIZ</div>
+<section class="panel hero">
+  <div class="disc">♫</div>
+  <h1>Welcher Song ist das?</h1>
+  <p>Hör genau hin – Titel und Interpret bleiben bis zur Auflösung verborgen.</p>
+  <div class="durations" aria-label="Hördauer"><button class="secondary selected" data-seconds="1">1 Sek.</button><button class="secondary" data-seconds="2">2 Sek.</button><button class="secondary" data-seconds="4">4 Sek.</button><button class="secondary" data-seconds="10">10 Sek.</button></div>
+  <div class="progress"><span id="progressBar"></span></div>
+  <div class="actions"><button class="primary" id="play" disabled>▶ Hörprobe abspielen</button></div>
+  <button class="secondary reveal" id="reveal" hidden>Songnamen verraten</button>
+  <div class="meta" id="answer" hidden><h2 id="songTitle"></h2><p id="artist"></p></div>
+  <div class="status" id="status" role="status">Lade die Apple-Music-Hörprobe …</div>
+  <audio id="audio" preload="auto"></audio>
+</section>
+<section class="panel">
+  <h2>Scanne den nächsten Song</h2>
+  <div id="reader"></div>
+  <div class="actions"><button class="secondary" id="startScan">▦ Kamera starten</button></div>
+  <p class="hint">Du kannst auch eine Apple-Music-Song-URL oder eine Song-ID eingeben.</p>
+  <label for="songInput">Apple-Music-Link oder Song-ID</label><input id="songInput" placeholder="Apple-Music-Link oder ID">
+  <div class="actions"><button class="secondary" id="loadSong">Song laden</button></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const DEFAULT_ID='298674756';
+let songId=DEFAULT_ID, previewUrl='', title='', artist='', duration=1, timer=null, scanner=null, scanning=false;
+function setStatus(text){$('status').textContent=text}
+function extractId(input){input=String(input||'').trim();const m=input.match(/(?:[?&]i=|\/song\/[^/]*\/)(\d{6,})/i)||input.match(/(?:apple\.com\/[^/]+\/song\/)(\d{6,})/i);if(m)return m[1];if(/^\d{6,}$/.test(input))return input;try{const u=new URL(input);const i=u.searchParams.get('i');if(i)return i;const p=u.pathname.match(/\/(\d{6,})\/?$/);if(p)return p[1]}catch(e){}return null}
+async function lookupWithTimeout(url, timeoutMs=9000){
+ const controller = new AbortController();
+ const timeout = setTimeout(()=>controller.abort(), timeoutMs);
+ try { const response = await fetch(url, {signal: controller.signal, cache:'no-store'}); if(!response.ok) throw new Error('HTTP '+response.status); return await response.json(); }
+ catch(e){ if(e.name==='AbortError') throw new Error('Zeitüberschreitung bei der Apple-Katalogabfrage.'); if(e instanceof TypeError) throw new Error('Safari konnte die Katalogabfrage nicht erreichen (möglicherweise Netzwerk-, Inhaltsblocker- oder CORS-Problem).'); throw e; }
+ finally { clearTimeout(timeout); }
+}
+async function loadSong(id){
+ id=extractId(id); if(!id){setStatus('Bitte gib eine gültige Apple-Music-Song-URL oder Song-ID ein.');return}
+ songId=id; clearTimeout(timer); $('audio').pause(); $('audio').removeAttribute('src'); $('audio').load(); $('play').disabled=true; $('reveal').hidden=true; $('answer').hidden=true; $('progressBar').style.width='0%'; title=''; artist=''; previewUrl=''; setStatus('Prüfe Apple-Kataloge …');
+ const countries=['lu','de','at','us']; let lastError=null, found=null, anyResponse=false;
+ for(const country of countries){
+   try {
+     setStatus('Suche Hörprobe im Apple-Katalog ('+country.toUpperCase()+') …');
+     const data=await lookupWithTimeout(`https://itunes.apple.com/lookup?id=${encodeURIComponent(id)}&entity=song&country=${country}`);
+     anyResponse=true;
+     const item=(data.results||[]).find(x=>String(x.trackId)===String(id)&&x.kind==='song')||(data.results||[]).find(x=>x.kind==='song');
+     if(item){found=item; if(item.previewUrl) break;}
+   } catch(e){lastError=e;}
+ }
+ if(!found){
+   if(!anyResponse && lastError) { setStatus('Apple-Katalog nicht erreichbar. '+lastError.message+' Öffne diese Seite über HTTPS und prüfe, ob Safari Inhaltsblocker oder Netzwerkfilter aktiviert hat.'); return; }
+   setStatus('Der Song wurde in den geprüften Katalogen nicht gefunden. Prüfe die Song-ID oder sende mir die genaue Meldung aus dieser Seite.'); return;
+ }
+ title=found.trackName||'Unbekannter Titel'; artist=found.artistName||'Unbekannter Interpret'; previewUrl=found.previewUrl||'';
+ if(!previewUrl){setStatus('Der Song wurde gefunden, aber Apple liefert in den geprüften Katalogen keine Hörprobe für diese Ausgabe.'); $('reveal').hidden=false; return;}
+ $('audio').src=previewUrl; $('audio').load(); $('play').disabled=false; $('reveal').hidden=false;
+ $('audio').onerror=()=>setStatus('Apple hat eine Vorschau-URL geliefert, aber Safari konnte die Audiodatei nicht laden. Prüfe Internetverbindung oder Inhaltsblocker.');
+ setStatus('Hörprobe bereit. Wähle eine Dauer und tippe auf „Hörprobe abspielen“.');
+ history.replaceState({},'',`${location.pathname}?song=${encodeURIComponent(id)}`);
+}
+function play(){if(!previewUrl){setStatus('Für diesen Song ist keine Hörprobe verfügbar.');return}clearTimeout(timer);const audio=$('audio');audio.pause();try{audio.currentTime=0}catch(e){}$('answer').hidden=true;$('progressBar').style.width='0%';const startedAt=performance.now();audio.play().then(()=>{setStatus('Jetzt gut zuhören …');timer=setTimeout(()=>{audio.pause();$('progressBar').style.width='100%';setStatus('Fertig! Du kannst den Songnamen verraten oder den nächsten Song scannen.');},duration*1000);const tick=()=>{if(!audio.paused){$('progressBar').style.width=Math.min(100,((performance.now()-startedAt)/(duration*1000))*100)+'%';requestAnimationFrame(tick)}};requestAnimationFrame(tick)}).catch(()=>setStatus('Wiedergabe wurde vom Browser blockiert. Tippe bitte erneut auf „Hörprobe abspielen“.'))}
+document.querySelectorAll('[data-seconds]').forEach(b=>b.addEventListener('click',()=>{duration=Number(b.dataset.seconds);document.querySelectorAll('[data-seconds]').forEach(x=>x.classList.toggle('selected',x===b))}));
+$('play').addEventListener('click',play);$('reveal').addEventListener('click',()=>{if(!title)return;$('songTitle').textContent=title;$('artist').textContent=artist;$('answer').hidden=false;$('reveal').hidden=true});$('loadSong').addEventListener('click',()=>loadSong($('songInput').value));
+async function startScan(){if(!window.Html5Qrcode){setStatus('Scanner lädt noch.');return}try{if(!scanner)scanner=new Html5Qrcode('reader');await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:230,height:230}},text=>{const id=extractId(text);if(id&&id!==songId)loadSong(id);else if(!id)setStatus('Das ist kein erkannter Apple-Music-Songlink.')},()=>{});scanning=true;setStatus('Kamera aktiv. Scanne den nächsten Apple-Music-QR-Code.')}catch(e){setStatus('Kamera nicht verfügbar. Bitte Kamera erlauben und die Seite über HTTPS öffnen.')}}
+$('startScan').addEventListener('click',startScan);
+const params=new URLSearchParams(location.search);loadSong(params.get('song')||params.get('id')||DEFAULT_ID);
+</script></body></html>
