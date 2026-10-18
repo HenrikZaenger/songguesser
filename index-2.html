@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="de">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width,initial-scale=1,viewport-fit=cover"
+        />
+        <meta name="theme-color" content="#101411" />
+        <title>QR Song Quiz</title>
+        <script src="https://unpkg.com/html5-qrcode" defer></script>
+        <style>
+            :root {
+                --bg: #101411;
+                --panel: #1b231d;
+                --green: #1ed760;
+                --muted: #aab7ac;
+                --line: #344239;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                background: linear-gradient(145deg, #0b100d, #18221a);
+                color: #f4f7f4;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    Segoe UI,
+                    sans-serif;
+                min-height: 100vh;
+            }
+            main {
+                max-width: 720px;
+                margin: auto;
+                padding: 22px 15px 44px;
+            }
+            .brand {
+                color: var(--green);
+                font-weight: 850;
+                letter-spacing: 0.08em;
+                font-size: 0.85rem;
+            }
+            h1 {
+                font-size: clamp(2.3rem, 10vw, 4rem);
+                line-height: 0.98;
+                margin: 20px 0 10px;
+                letter-spacing: -0.04em;
+            }
+            h2 {
+                font-size: 1.15rem;
+                margin: 0 0 14px;
+            }
+            p {
+                color: var(--muted);
+                line-height: 1.5;
+            }
+            .panel {
+                background: rgba(27, 35, 29, 0.97);
+                border: 1px solid var(--line);
+                border-radius: 22px;
+                padding: 18px;
+                margin: 15px 0;
+            }
+            button,
+            .btn {
+                border: 0;
+                border-radius: 999px;
+                padding: 12px 16px;
+                font-weight: 800;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                text-decoration: none;
+                font: inherit;
+                font-weight: 750;
+            }
+            .primary {
+                background: var(--green);
+                color: #071009;
+            }
+            .secondary {
+                background: #303c33;
+                color: white;
+                border: 1px solid #4a5a4d;
+            }
+            button:disabled {
+                opacity: 0.45;
+                cursor: not-allowed;
+            }
+            .actions {
+                display: flex;
+                gap: 9px;
+                flex-wrap: wrap;
+                margin-top: 12px;
+            }
+            .status {
+                background: #101811;
+                border: 1px solid #28372b;
+                padding: 12px;
+                border-radius: 12px;
+                margin-top: 12px;
+                color: #dce9de;
+                font-size: 0.92rem;
+                overflow-wrap: anywhere;
+            }
+            #reader {
+                width: 100%;
+                overflow: hidden;
+                border-radius: 15px;
+            }
+            #reader video {
+                border-radius: 15px;
+            }
+            label {
+                font-size: 0.88rem;
+                color: #dce5dd;
+                display: block;
+                margin: 9px 0 4px;
+            }
+            input {
+                width: 100%;
+                background: #0e1510;
+                color: white;
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                padding: 12px;
+                font: inherit;
+                margin-bottom: 5px;
+            }
+            .song {
+                display: flex;
+                gap: 13px;
+                align-items: center;
+                margin: 12px 0;
+            }
+            .disc {
+                width: 56px;
+                height: 56px;
+                border-radius: 50%;
+                flex: none;
+                background: radial-gradient(
+                    circle,
+                    #0c120e 0 12%,
+                    var(--green) 13% 18%,
+                    #213b2a 19% 100%
+                );
+                display: grid;
+                place-items: center;
+                font-size: 1.2rem;
+            }
+            .song strong {
+                display: block;
+                font-size: 1.12rem;
+            }
+            .song small {
+                display: block;
+                color: var(--muted);
+                margin-top: 3px;
+            }
+            .small {
+                font-size: 0.83rem;
+            }
+            .pill {
+                display: inline-block;
+                padding: 4px 9px;
+                border-radius: 999px;
+                background: #29362c;
+                color: #ccebd3;
+                font-size: 0.75rem;
+                font-weight: 750;
+            }
+            .progress {
+                height: 5px;
+                border-radius: 99px;
+                background: #344239;
+                overflow: hidden;
+                margin: 12px 0;
+            }
+            .progress span {
+                display: block;
+                height: 100%;
+                width: 0;
+                background: var(--green);
+            }
+            footer {
+                color: #87968a;
+                font-size: 0.78rem;
+                line-height: 1.5;
+                margin-top: 22px;
+            }
+            .nav {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            .nav a {
+                color: #d8e9db;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <div class="brand">
+                ● QR SONG QUIZ <span class="pill">PLAYER</span>
+            </div>
+            <h1>Scannen.<br />Einloggen.<br />Musik hören.</h1>
+            <p>
+                Jeder QR-Code führt hierher und enthält die Song-ID. Nach einem
+                Song kannst du direkt den nächsten Code scannen.
+            </p>
+            <section class="panel">
+                <h2>Spotify verbinden</h2>
+                <div class="song">
+                    <div class="disc">♪</div>
+                    <div>
+                        <strong id="loginLabel">Spotify nicht verbunden</strong
+                        ><small id="profile"
+                            >Melde dich an, um die Wiedergabe zu
+                            aktivieren.</small
+                        >
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="primary" id="login">
+                        Mit Spotify anmelden</button
+                    ><button class="secondary" id="logout" hidden>
+                        Abmelden
+                    </button>
+                </div>
+                <p class="small">
+                    Die Client-ID wird später in der Konfiguration eingetragen.
+                    Für die Browser-App wird PKCE verwendet; kein Client Secret
+                    im Quellcode.
+                </p>
+            </section>
+            <section class="panel">
+                <h2>QR-Code scannen</h2>
+                <div id="reader"></div>
+                <div class="actions">
+                    <button class="primary" id="start">▦ Kamera starten</button
+                    ><button class="secondary" id="stop">Kamera stoppen</button
+                    ><button class="secondary" id="manualToggle">
+                        Song-Link eingeben
+                    </button>
+                </div>
+                <div id="manualArea" hidden>
+                    <label for="trackInput"
+                        >Song-URL, Track-ID oder QR-Link</label
+                    ><input
+                        id="trackInput"
+                        placeholder="https://DEINE-WEBSITE/?track=..."
+                    /><button class="primary" id="loadTrack">Song laden</button>
+                </div>
+                <div class="status" id="status" role="status">
+                    Bereit. Scanne einen QR-Code oder öffne einen Song-Link.
+                </div>
+            </section>
+            <section class="panel">
+                <h2>Aktueller Song</h2>
+                <div class="song">
+                    <div class="disc">♫</div>
+                    <div>
+                        <strong id="trackTitle">Noch kein Song gewählt</strong
+                        ><small id="trackSub">Der Song erscheint hier.</small>
+                    </div>
+                </div>
+                <div class="progress"><span id="progressBar"></span></div>
+                <div class="actions">
+                    <button class="primary" id="play" disabled>
+                        ▶ Song starten</button
+                    ><button class="secondary" id="openSpotify" disabled>
+                        In Spotify öffnen ↗</button
+                    ><button class="secondary" id="nextScan">
+                        Nächsten Song scannen ↓
+                    </button>
+                </div>
+                <p class="small">
+                    Wenn der Song fertig ist, tippe auf „Nächsten Song scannen“
+                    und scanne den nächsten QR-Code. Spotify kann eine
+                    zusätzliche Nutzeraktion verlangen; Stopp nach einer Sekunde
+                    ist wegen Netzwerklatenz nicht exakt garantiert.
+                </p>
+            </section>
+            <section class="panel">
+                <details>
+                    <summary>Spotify-Konfiguration</summary>
+                    <label for="clientId">Spotify Client ID</label
+                    ><input
+                        id="clientId"
+                        placeholder="Später aus dem Developer Dashboard"
+                    />
+                    <label for="redirectUri">Redirect URI</label
+                    ><input
+                        id="redirectUri"
+                        placeholder="Öffentliche URL dieser Website"
+                    />
+                    <button class="primary" id="saveConfig">
+                        Konfiguration speichern
+                    </button>
+                </details>
+            </section>
+            <footer>
+                QR-Format der Helferwebsite:
+                <code>https://DEINE-WEBSITE/?track=SPOTIFY_TRACK_ID</code>.
+                Veröffentlichte Website muss HTTPS verwenden. Spotify Web
+                Playback SDK benötigt Spotify Premium.
+            </footer>
+        </main>
+        <script>
+            const $ = (id) => document.getElementById(id),
+                CFG = "qr-song-quiz-config",
+                TOK = "qr-song-quiz-token";
+            let config = {
+                clientId: "144d7bf257df408c8812f246087b0d5b",
+                redirectUri: location.origin + location.pathname,
+            };
+            try {
+                config = {
+                    ...config,
+                    ...JSON.parse(localStorage.getItem(CFG) || "{}"),
+                };
+            } catch (e) {}
+            let accessToken = "",
+                player = null,
+                deviceId = "",
+                currentTrack = "",
+                scanner = null,
+                running = false,
+                stopTimer = null;
+            function status(t) {
+                $("status").textContent = t;
+            }
+            function rand(n = 64) {
+                const chars =
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~",
+                    a = crypto.getRandomValues(new Uint8Array(n));
+                return Array.from(a, (b) => chars[b % chars.length]).join("");
+            }
+            function b64url(buf) {
+                return btoa(String.fromCharCode(...new Uint8Array(buf)))
+                    .replace(/\+/g, "-")
+                    .replace(/\//g, "_")
+                    .replace(/=+$/, "");
+            }
+            async function digest(s) {
+                return b64url(
+                    await crypto.subtle.digest(
+                        "SHA-256",
+                        new TextEncoder().encode(s),
+                    ),
+                );
+            }
+            function parseTrack(v) {
+                v = String(v || "").trim();
+                let m =
+                    v.match(/spotify:track:([A-Za-z0-9]+)/i) ||
+                    v.match(
+                        /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([A-Za-z0-9]+)/i,
+                    );
+                if (m) return m[1];
+                if (/^[A-Za-z0-9]{22}$/.test(v)) return v;
+                try {
+                    let u = new URL(v);
+                    return parseTrack(
+                        u.searchParams.get("track") || u.searchParams.get("id"),
+                    );
+                } catch (e) {}
+                return null;
+            }
+            function setLoginUI() {
+                let yes = !!accessToken;
+                $("loginLabel").textContent = yes
+                    ? "Spotify verbunden"
+                    : "Spotify nicht verbunden";
+                $("profile").textContent = yes
+                    ? "Du bist angemeldet. Scanne einen Song-QR-Code."
+                    : "Melde dich an, um die Wiedergabe zu aktivieren.";
+                $("login").hidden = yes;
+                $("logout").hidden = !yes;
+            }
+            async function login() {
+                config.clientId = $("clientId").value.trim() || config.clientId;
+                config.redirectUri =
+                    $("redirectUri").value.trim() || config.redirectUri;
+                if (!config.clientId) {
+                    status(
+                        "Bitte zuerst die Spotify Client ID unter „Spotify-Konfiguration“ eintragen.",
+                    );
+                    return;
+                }
+                let verifier = rand(),
+                    state = rand(24),
+                    challenge = await digest(verifier);
+                sessionStorage.setItem("pkce_verifier", verifier);
+                sessionStorage.setItem("oauth_state", state);
+                sessionStorage.setItem("pending_track", currentTrack);
+                let u = new URL("https://accounts.spotify.com/authorize");
+                u.search = new URLSearchParams({
+                    client_id: config.clientId,
+                    response_type: "code",
+                    redirect_uri: config.redirectUri,
+                    code_challenge_method: "S256",
+                    code_challenge: challenge,
+                    state,
+                    scope: "streaming user-read-email user-read-private user-modify-playback-state",
+                }).toString();
+                location.href = u.href;
+            }
+            async function callback() {
+                let q = new URLSearchParams(location.search),
+                    code = q.get("code");
+                if (q.get("error")) {
+                    status("Spotify-Anmeldung abgebrochen.");
+                    history.replaceState({}, "", location.pathname);
+                    return;
+                }
+                if (!code) return;
+                if (q.get("state") !== sessionStorage.getItem("oauth_state")) {
+                    status("OAuth-Sicherheitsprüfung fehlgeschlagen.");
+                    return;
+                }
+                try {
+                    let r = await fetch(
+                            "https://accounts.spotify.com/api/token",
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type":
+                                        "application/x-www-form-urlencoded",
+                                },
+                                body: new URLSearchParams({
+                                    client_id: config.clientId,
+                                    grant_type: "authorization_code",
+                                    code,
+                                    redirect_uri: config.redirectUri,
+                                    code_verifier:
+                                        sessionStorage.getItem("pkce_verifier"),
+                                }),
+                            },
+                        ),
+                        d = await r.json();
+                    if (!r.ok) throw Error(d.error_description || d.error);
+                    d.expires_at = Date.now() + d.expires_in * 1000;
+                    localStorage.setItem(TOK, JSON.stringify(d));
+                    accessToken = d.access_token;
+                    history.replaceState({}, "", location.pathname);
+                    let pending = sessionStorage.getItem("pending_track");
+                    sessionStorage.removeItem("pending_track");
+                    setLoginUI();
+                    await setupPlayer();
+                    if (pending) await loadTrack(pending);
+                    else status("Spotify verbunden.");
+                } catch (e) {
+                    status("Spotify-Login fehlgeschlagen: " + e.message);
+                }
+            }
+            async function refresh() {
+                try {
+                    let d = JSON.parse(localStorage.getItem(TOK) || "{}");
+                    if (d.access_token && d.expires_at > Date.now() + 15000) {
+                        accessToken = d.access_token;
+                        return accessToken;
+                    }
+                    if (d.refresh_token) {
+                        let r = await fetch(
+                                "https://accounts.spotify.com/api/token",
+                                {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type":
+                                            "application/x-www-form-urlencoded",
+                                    },
+                                    body: new URLSearchParams({
+                                        client_id: config.clientId,
+                                        grant_type: "refresh_token",
+                                        refresh_token: d.refresh_token,
+                                    }),
+                                },
+                            ),
+                            n = await r.json();
+                        if (r.ok) {
+                            d = {
+                                ...d,
+                                ...n,
+                                expires_at: Date.now() + n.expires_in * 1000,
+                            };
+                            localStorage.setItem(TOK, JSON.stringify(d));
+                            accessToken = d.access_token;
+                            return accessToken;
+                        }
+                    }
+                } catch (e) {}
+                accessToken = "";
+                return "";
+            }
+            function sdk() {
+                return new Promise((resolve, reject) => {
+                    if (window.Spotify) return resolve();
+                    window.onSpotifyWebPlaybackSDKReady = resolve;
+                    let s = document.createElement("script");
+                    s.src = "https://sdk.scdn.co/spotify-player.js";
+                    s.onerror = reject;
+                    document.head.append(s);
+                });
+            }
+            async function setupPlayer() {
+                if (!accessToken || player) return;
+                try {
+                    await sdk();
+                    player = new Spotify.Player({
+                        name: "QR Song Quiz",
+                        getOAuthToken: (cb) => cb(accessToken),
+                        volume: 0.8,
+                    });
+                    player.addListener("ready", (x) => {
+                        deviceId = x.device_id;
+                        status(
+                            "Spotify-Player bereit. Tippe auf Song starten.",
+                        );
+                    });
+                    player.addListener("account_error", () =>
+                        status(
+                            "Spotify Premium wird für den Web Player benötigt.",
+                        ),
+                    );
+                    player.addListener("authentication_error", () =>
+                        status(
+                            "Spotify-Login abgelaufen. Bitte erneut anmelden.",
+                        ),
+                    );
+                    player.addListener("playback_error", (e) =>
+                        status("Wiedergabefehler: " + e.message),
+                    );
+                    await player.connect();
+                } catch (e) {
+                    status(
+                        "Spotify Player konnte nicht gestartet werden. Prüfe Browser und Verbindung.",
+                    );
+                }
+            }
+            async function loadTrack(raw) {
+                let id = parseTrack(raw);
+                if (!id) {
+                    status("Kein gültiger Spotify-Track erkannt.");
+                    return;
+                }
+                currentTrack = id;
+                $("trackTitle").textContent = "Spotify-Track " + id;
+                $("trackSub").textContent = "Song-ID aus QR-Code erkannt";
+                $("play").disabled = false;
+                $("openSpotify").disabled = false;
+                $("progressBar").style.width = "0%";
+                $("openSpotify").onclick = () =>
+                    window.open(
+                        "https://open.spotify.com/track/" + currentTrack,
+                        "_blank",
+                        "noopener",
+                    );
+                status(
+                    accessToken
+                        ? "Song erkannt. Tippe auf „Song starten“."
+                        : "Song erkannt. Melde dich mit Spotify an, um abzuspielen.",
+                );
+                if (accessToken) {
+                    try {
+                        let r = await fetch(
+                            "https://api.spotify.com/v1/tracks/" + id,
+                            {
+                                headers: {
+                                    Authorization: "Bearer " + accessToken,
+                                },
+                            },
+                        );
+                        if (r.ok) {
+                            let d = await r.json();
+                            $("trackTitle").textContent = d.name;
+                            $("trackSub").textContent =
+                                d.artists.map((a) => a.name).join(", ") +
+                                " · " +
+                                id;
+                        }
+                    } catch (e) {}
+                }
+            }
+            async function playTrack() {
+                if (!currentTrack) {
+                    status("Scanne zuerst einen Song.");
+                    return;
+                }
+                accessToken = await refresh();
+                if (!accessToken) {
+                    sessionStorage.setItem("pending_track", currentTrack);
+                    await login();
+                    return;
+                }
+                if (!player || !deviceId) {
+                    await setupPlayer();
+                    status(
+                        "Player wird gestartet. Tippe erneut auf „Song starten“, falls nötig.",
+                    );
+                    return;
+                }
+                try {
+                    await fetch("https://api.spotify.com/v1/me/player", {
+                        method: "PUT",
+                        headers: {
+                            Authorization: "Bearer " + accessToken,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            device_ids: [deviceId],
+                            play: true,
+                        }),
+                    });
+                    let r = await fetch(
+                        "https://api.spotify.com/v1/me/player/play?device_id=" +
+                            deviceId,
+                        {
+                            method: "PUT",
+                            headers: {
+                                Authorization: "Bearer " + accessToken,
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                uris: ["spotify:track:" + currentTrack],
+                                position_ms: 0,
+                            }),
+                        },
+                    );
+                    if (!r.ok)
+                        throw Error(
+                            "Spotify konnte nicht starten. Prüfe Premium und aktives Gerät.",
+                        );
+                    status(
+                        "Song läuft. Die App fordert nach ca. 1 Sekunde eine Pause an.",
+                    );
+                    let start = performance.now();
+                    const tick = () => {
+                        let ms = performance.now() - start;
+                        $("progressBar").style.width =
+                            Math.min(100, ms / 10) + "%";
+                        if (ms >= 1000) {
+                            player.pause();
+                            $("progressBar").style.width = "100%";
+                            status(
+                                "Pause angefordert. Die tatsächliche Dauer kann variieren.",
+                            );
+                        } else requestAnimationFrame(tick);
+                    };
+                    requestAnimationFrame(tick);
+                } catch (e) {
+                    status(e.message);
+                }
+            }
+            async function startScan() {
+                if (running) return;
+                if (!window.Html5Qrcode) {
+                    status("Scanner lädt noch.");
+                    return;
+                }
+                try {
+                    scanner = new Html5Qrcode("reader");
+                    await scanner.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 230, height: 230 } },
+                        (txt) => {
+                            let id = parseTrack(txt);
+                            if (id && id !== currentTrack) loadTrack(txt);
+                            else if (!id)
+                                status(
+                                    "Dieser QR-Code enthält keine gültige Spotify-Track-ID.",
+                                );
+                        },
+                        () => {},
+                    );
+                    running = true;
+                    status("Kamera aktiv. Scanne den nächsten QR-Code.");
+                } catch (e) {
+                    status(
+                        "Kamera nicht verfügbar. Erlaube den Zugriff und nutze HTTPS.",
+                    );
+                }
+            }
+            $("login").onclick = login;
+            $("logout").onclick = () => {
+                localStorage.removeItem(TOK);
+                accessToken = "";
+                if (player) {
+                    player.disconnect();
+                    player = null;
+                    deviceId = "";
+                }
+                setLoginUI();
+                status("Abgemeldet.");
+            };
+            $("start").onclick = startScan;
+            $("stop").onclick = async () => {
+                if (scanner && running) {
+                    try {
+                        await scanner.stop();
+                        scanner.clear();
+                    } catch (e) {}
+                    running = false;
+                }
+                status("Kamera gestoppt.");
+            };
+            $("manualToggle").onclick = () => {
+                $("manualArea").hidden = !$("manualArea").hidden;
+            };
+            $("loadTrack").onclick = () => loadTrack($("trackInput").value);
+            $("play").onclick = playTrack;
+            $("nextScan").onclick = () => {
+                currentTrack = "";
+                $("trackTitle").textContent = "Noch kein Song gewählt";
+                $("trackSub").textContent = "Scanne den nächsten QR-Code.";
+                $("play").disabled = true;
+                $("openSpotify").disabled = true;
+                $("progressBar").style.width = "0%";
+                $("manualArea").hidden = true;
+                status(
+                    "Bereit für den nächsten Song. Starte den Scanner oder öffne die Kamera, falls sie gestoppt ist.",
+                );
+                startScan();
+            };
+            $("saveConfig").onclick = () => {
+                config.clientId = $("clientId").value.trim();
+                config.redirectUri =
+                    $("redirectUri").value.trim() ||
+                    location.origin + location.pathname;
+                localStorage.setItem(CFG, JSON.stringify(config));
+                status(
+                    "Konfiguration gespeichert. Redirect URI muss im Spotify Developer Dashboard identisch registriert sein.",
+                );
+            };
+            $("clientId").value = config.clientId;
+            $("redirectUri").value = config.redirectUri;
+            (async () => {
+                await callback();
+                accessToken = await refresh();
+                setLoginUI();
+                if (accessToken) setupPlayer();
+                let q = new URLSearchParams(location.search),
+                    track = q.get("track") || q.get("id");
+                if (track) loadTrack(track);
+            })();
+        </script>
+    </body>
+</html>
